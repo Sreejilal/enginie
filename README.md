@@ -58,7 +58,9 @@ node scripts/evaluate-recordings.mjs <folder> [--half-as-references]
 
 ## Put it online
 
-`.github/workflows/pages.yml` publishes `public/` to GitHub Pages whenever you push to `main`. Turn it on in the repository’s **Settings → Pages → Source: GitHub Actions**. On a free GitHub account, the repository must be public for Pages to work.
+The live site is at **https://sreejilal.github.io/enginie/**.
+
+GitHub Pages publishes it from the `main` branch, using the repository root. The `index.html` at the root forwards visitors to `public/`, and `.nojekyll` makes GitHub serve the files exactly as they are. Pushing to `main` updates the site within a minute or two, and `.github/workflows/pages.yml` runs the tests on every push.
 
 ## Project layout
 
