@@ -1,0 +1,13 @@
+{
+  "name": "Enginie: what’s that noise?",
+  "short_name": "Enginie",
+  "description": "Record the noise your vehicle is making. See what it could be, whether you can keep driving and what a fair price looks like.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffdf3f",
+  "theme_color": "#ffdf3f",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

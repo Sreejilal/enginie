@@ -1,0 +1,16 @@
+{
+  "name": "enginie",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Record the sound a vehicle is making and compare it with a database of known faults.",
+  "scripts": {
+    "start": "node server.js",
+    "build:database": "node scripts/build-database.mjs",
+    "evaluate": "node scripts/evaluate-recordings.mjs",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

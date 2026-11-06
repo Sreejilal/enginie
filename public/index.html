@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Enginie: what’s that noise?</title>
+  <meta name="description" content="Your vehicle is making a noise. Find out what it could be, whether it’s safe to keep driving, what a fair price looks like and what to ask the mechanic. Free, with no sign-up.">
+  <meta name="theme-color" content="#ffdf3f">
+  <meta property="og:title" content="Enginie: what’s that noise?">
+  <meta property="og:description" content="Record the noise your vehicle is making. See what it could be, whether you can keep driving and what a fair price looks like.">
+  <meta property="og:type" content="website">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="preload" href="fonts/BarlowCondensed-800.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="masthead">
+    <a class="wordmark" href="#/">Enginie</a>
+    <button class="menu-button" id="menu-button" type="button" aria-expanded="false" aria-controls="site-menu">Menu</button>
+    <div class="site-menu" id="site-menu">
+      <nav aria-label="Main">
+        <a href="#/" data-nav="home">Check a noise</a>
+        <a href="#/faults" data-nav="faults">Sound database</a>
+        <a href="#/engines" data-nav="engines">Engines</a>
+        <a href="#/help" data-nav="help">Dealing with the shop</a>
+        <a href="#/about" data-nav="about">How far to trust this</a>
+      </nav>
+      <button class="mode-toggle" id="mechanic-toggle" type="button" aria-pressed="false">Mechanic mode: off</button>
+    </div>
+  </header>
+
+  <main id="main" tabindex="-1"></main>
+
+  <footer class="footer">
+    <p>Enginie gives rough guesses from sound and your answers. A mechanic’s inspection always outranks it. If your vehicle feels unsafe, stop driving, whatever this site says.</p>
+    <p><a href="#/about">How far to trust this</a></p>
+  </footer>
+
+  <noscript>
+    <p class="noscript">Enginie needs JavaScript to listen to sounds. Turn it on in your browser and reload this page.</p>
+  </noscript>
+</body>
+</html>

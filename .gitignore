@@ -1,0 +1,10 @@
+node_modules/
+.playwright-mcp/
+.DS_Store
+Thumbs.db
+
+# Real recordings are only published if you have the rights to them. Their measurements go into
+# public/data/sound-database.json, but the audio itself should never be committed by accident.
+recordings/**/*.wav
+recordings/**/*.mp3
+recordings/**/*.m4a
