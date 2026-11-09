@@ -21,7 +21,7 @@ export function renderAbout(main) {
 
     <section class="help-section" data-reveal aria-labelledby="tested-title">
       <h2 id="tested-title">What happened when we tested it</h2>
-      <p class="section-lede">We tested Enginie on 80 real phone recordings of small petrol cars that it had never heard before. They covered four conditions: healthy, misfire, tappet noise and belt noise. Each time, it had to choose from all ${FAULTS.length} faults.</p>
+      <p class="section-lede">We tested Enginie on 80 real phone recordings of small petrol cars that it had never heard before. They covered four conditions: healthy, misfire, tappet noise and belt noise. Each time, it had to choose from all 32 faults Enginie covered at the time.</p>
       <div class="table-wrap">
         <table class="evidence">
           <thead>

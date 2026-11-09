@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { before, test } from 'node:test';
 import { judgeQuote, shopCost } from '../public/js/cost.js';
 import { ENGINES } from '../public/js/data/engines.js';
-import { faultById, FAULTS } from '../public/js/data/faults.js';
+import { AREAS, faultById, FAULTS } from '../public/js/data/faults.js';
 import { CONTEXTS, FOLLOWS, LOCATIONS, SOUND_WORDS } from '../public/js/data/symptoms.js';
 import { analyze, distance, resample, SAMPLE_RATE, similarity } from '../public/js/features.js';
 import { checkRecording, hearSound, parseDatabase, rankFaults, STRONG_FIT, symptomScore } from '../public/js/match.js';
@@ -64,6 +64,14 @@ test('every fault is complete and uses valid answers', () => {
     fault.confusedWith.forEach(({ id }) => assert.ok(faultById(id), `${label}: unknown confusion ${id}`));
   }
   for (const engine of ENGINES) assert.ok(db.engineImages.get(engine.id), `${engine.id} has no picture`);
+});
+
+test('every answer someone can pick leads to at least one fault', () => {
+  const used = (value, key) => FAULTS.some((fault) => fault[key].includes(value));
+  for (const word of Object.keys(SOUND_WORDS)) assert.ok(used(word, 'words'), `no fault sounds like "${word}"`);
+  for (const context of Object.keys(CONTEXTS)) assert.ok(used(context, 'contexts'), `no fault happens when "${context}"`);
+  for (const place of Object.keys(LOCATIONS)) assert.ok(used(place, 'where'), `no fault comes from "${place}"`);
+  for (const area of AREAS) assert.ok(FAULTS.some((fault) => fault.area === area), `the "${area}" area has no faults`);
 });
 
 test('a fault that must stop the vehicle never says it is fine to drive', () => {
@@ -147,6 +155,11 @@ test('answers alone point to the right fault, with no recording at all', () => {
   assert.ok(top3({ words: ['click'], contexts: ['starting'], where: 'engine', follows: 'neither' }).includes('starter-clicking'));
   assert.ok(top3({ words: ['hum'], contexts: ['cruising'], where: 'wheel', follows: 'road' }).includes('wheel-bearing'));
   assert.ok(top3({ words: ['hiss'], contexts: ['idling'], where: 'engine', follows: 'neither' }).includes('vacuum-leak'));
+  assert.ok(top3({ words: ['tick'], contexts: ['shutdown'], where: 'under', follows: 'neither' }).includes('hot-exhaust-ticking'));
+  assert.ok(top3({ words: ['click'], contexts: ['ac'], where: 'cabin', follows: 'neither' }).includes('blend-door-actuator'));
+  assert.ok(top3({ words: ['creak'], contexts: ['bumps'], where: 'wheel', follows: 'neither' }).includes('suspension-creak'));
+  assert.ok(top3({ words: ['clunk'], contexts: ['shifting'], where: 'engine', follows: 'neither' }).includes('engine-mount'));
+  assert.ok(top3({ words: ['whistle'], contexts: ['cruising'], where: 'cabin', follows: 'road' }).includes('wind-whistle'));
 });
 
 test('answers that contradict a fault lower its score', () => {

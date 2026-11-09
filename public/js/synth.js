@@ -265,6 +265,14 @@ const RECIPES = {
     { hz: r.range(1500, 3000), decay: 0.009, amp: 0.9, noisy: 0.45 },
   ),
 
+  'engine-mount': (n, r, engine, rpm) => {
+    const out = engineRun(n, r, engine, { rpm, level: 0.6 });
+    // One heavy thud each time the load changes, such as shifting into drive and back.
+    const thud = { hz: r.range(80, 180), decay: 0.04, amp: 1.2, noisy: 0.15 };
+    everyBeat(n, r, r.range(0.4, 0.7), 0.3, (at) => addClick(out, at, thud, r));
+    return out;
+  },
+
   // Exhaust
 
   'exhaust-leak': (n, r, engine, rpm) => {
@@ -453,6 +461,15 @@ const RECIPES = {
     return out;
   },
 
+  'suspension-creak': (n, r) => {
+    // Rubber sticking and slipping: a fast run of tiny ticks each time the suspension moves.
+    const creak = new Float32Array(n);
+    clickTrain(creak, r, r.range(35, 70), 0.25, { hz: r.range(400, 900), decay: 0.004, amp: 0.5, noisy: 0.35 });
+    const bumpHz = r.range(0.5, 0.9);
+    shape(creak, (t) => smoothGate(t, bumpHz, 0.5));
+    return mix(roadNoise(n, r, 0.05), creak);
+  },
+
   // Transmission and axle
 
   'transmission-whine': (n, r, engine) => {
@@ -466,6 +483,96 @@ const RECIPES = {
     shape(howl, (t) => 0.7 + 0.3 * Math.sin(TAU * beatHz * t));
     return mix(roadNoise(n, r, 0.12), howl, 0.3);
   },
+
+  'u-joint': (n, r) => {
+    const out = roadNoise(n, r, 0.08);
+    // A dry joint chirps once per driveshaft turn, and the slack clunks as the drive takes up.
+    const chirp = tone(n, r, { hz: r.range(1800, 3200), partials: [1, 0.35], wobbleHz: r.range(4, 8), wobble: 0.01 });
+    const shaftHz = r.range(3, 6);
+    shape(chirp, (t) => smoothGate(t, shaftHz, 0.25));
+    mix(out, chirp, 0.18);
+    addClick(out, Math.floor(r.range(0.2, 0.5) * n), { hz: r.range(90, 200), decay: 0.035, amp: 1, noisy: 0.2 }, r);
+    return out;
+  },
+
+  // Heating and cabin
+
+  'blower-motor': (n, r) => {
+    const air = noiseBand(n, r, 'bandpass', r.range(700, 1400), 0.4, 0.12);
+    const motor = tone(n, r, { hz: r.range(150, 320), partials: [1, 0.5, 0.35, 0.2], wobbleHz: r.range(0.3, 0.8), wobble: 0.004 });
+    const debris = new Float32Array(n);
+    clickTrain(debris, r, r.range(15, 30), 0.05, { hz: r.range(2000, 4000), decay: 0.002, amp: 0.25, noisy: 0.5 });
+    return mix(mix(air, motor, 0.12), debris);
+  },
+
+  'blend-door-actuator': (n, r) => {
+    const out = noiseBand(n, r, 'lowpass', 1500, 0.7, 0.01);
+    const click = { hz: r.range(2000, 4000), decay: 0.003, amp: 0.7, noisy: 0.4 };
+    const tap = { hz: r.range(300, 600), decay: 0.006, amp: 0.3, noisy: 0.2 };
+    everyBeat(n, r, r.range(3, 7), 0.05, (at) => {
+      addClick(out, at, click, r);
+      addClick(out, at, tap, r);
+    });
+    return out;
+  },
+
+  'dash-rattle': (n, r) => {
+    const rattle = new Float32Array(n);
+    clickTrain(rattle, r, r.range(25, 50), 0.5, { hz: r.range(1500, 4000), decay: 0.002, amp: 0.5, noisy: 0.6 });
+    const burstHz = r.range(0.8, 1.8);
+    shape(rattle, (t) => smoothGate(t, burstHz, 0.35));
+    return mix(roadNoise(n, r, 0.1), rattle);
+  },
+
+  'wind-whistle': (n, r) => {
+    const gustHz = r.range(0.15, 0.4);
+    const rush = noiseBand(n, r, 'bandpass', r.range(500, 1000), 0.5, 0.15);
+    const whistle = tone(n, r, { hz: r.range(1500, 4000), partials: [1, 0.1], wobbleHz: r.range(0.5, 2), wobble: 0.01 });
+    shape(whistle, (t) => 0.4 + 0.6 * Math.sin(TAU * gustHz * t) ** 2);
+    return mix(mix(roadNoise(n, r, 0.1), rush), whistle, 0.12);
+  },
+
+  // Normal sounds
+
+  'hot-exhaust-ticking': (n, r) => {
+    // Engine off: near silence, and sparse ticks of different sizes as the metal cools.
+    const out = noiseBand(n, r, 'lowpass', 1200, 0.7, 0.004);
+    everyBeat(n, r, r.range(2, 4), 0.9, (at) => {
+      addClick(out, at, { hz: r.range(2500, 7000), decay: 0.002, amp: r.range(0.2, 1), noisy: 0.3 }, r);
+    });
+    return out;
+  },
+
+  'fan-after-shutoff': (n, r) => {
+    const rush = noiseBand(n, r, 'bandpass', r.range(400, 900), 0.5, 0.2);
+    const blades = tone(n, r, { hz: r.range(120, 300), partials: [1, 0.4, 0.2], wobbleHz: 0.3, wobble: 0.005 });
+    const motor = tone(n, r, { hz: r.range(900, 1800), wobbleHz: 0.5, wobble: 0.003 });
+    return mix(mix(rush, blades, 0.1), motor, 0.02);
+  },
+
+  'injector-tick': (n, r, engine, rpm) => clickTrain(
+    engineRun(n, r, engine, { rpm, level: 0.7 }),
+    r,
+    order(rpm, engine.cylinders / 2),
+    0.005,
+    { hz: r.range(4000, 7000), decay: 0.0015, amp: 0.35, noisy: 0.2 },
+  ),
+
+  'abs-self-test': (n, r) => {
+    const out = roadNoise(n, r, 0.06);
+    // Once, about a second in: the pump runs briefly, with a valve click at each end.
+    const from = Math.floor(r.range(0.25, 0.4) * n);
+    const length = Math.floor(r.range(0.4, 0.8) * SAMPLE_RATE);
+    const pump = tone(length, r, { hz: r.range(100, 180), partials: [1, 0.7, 0.5, 0.35, 0.2], wobbleHz: 12, wobble: 0.03 });
+    for (let i = 0; i < length && from + i < n; i++) {
+      const fade = Math.min(1, i / 400, (length - i) / 400);
+      out[from + i] += 0.5 * fade * pump[i];
+    }
+    const valve = { hz: r.range(1500, 3000), decay: 0.003, amp: 0.6, noisy: 0.4 };
+    addClick(out, from, valve, r);
+    addClick(out, Math.min(n - 1, from + length), valve, r);
+    return out;
+  },
 };
 
 export const hasSound = (id) => id in RECIPES;
@@ -473,7 +580,9 @@ export const hasSound = (id) => id in RECIPES;
 // Faults that sound the same whatever engine is fitted, so they only need a few takes.
 const ENGINE_INDEPENDENT = new Set([
   'fuel-pump-whine', 'starter-clicking', 'starter-grind', 'wheel-bearing', 'tire-cupping',
-  'suspension-clunk', 'loose-wheel', 'differential-howl',
+  'suspension-clunk', 'loose-wheel', 'differential-howl', 'suspension-creak', 'u-joint',
+  'blower-motor', 'blend-door-actuator', 'dash-rattle', 'wind-whistle', 'hot-exhaust-ticking',
+  'fan-after-shutoff', 'abs-self-test',
 ]);
 export const dependsOnEngine = (id) => !ENGINE_INDEPENDENT.has(id);
 
