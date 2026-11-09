@@ -8,3 +8,14 @@ Thumbs.db
 recordings/**/*.wav
 recordings/**/*.mp3
 recordings/**/*.m4a
+recordings/**/*.aac
+recordings/**/*.ogg
+recordings/**/*.oga
+recordings/**/*.opus
+recordings/**/*.flac
+recordings/**/*.webm
+recordings/**/*.3gp
+recordings/**/*.amr
+recordings/**/*.wma
+# Downloaded candidates waiting to be checked by ear.
+recordings-review/

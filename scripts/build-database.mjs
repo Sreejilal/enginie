@@ -1,8 +1,8 @@
 // Generates public/data/sound-database.json. Run with `npm run build:database`.
 //
 // It holds a picture of each reference sound, plus sound prints of any real recordings you have
-// the rights to use. Put those in recordings/<fault-id>/*.wav. Only their measurements
-// are stored, never the audio itself.
+// the rights to use. Put those in recordings/<fault-id>/, as WAV or any format ffmpeg can read,
+// such as phone recordings and voice notes. Only their measurements are stored, never the audio.
 import { existsSync, readdirSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -10,7 +10,7 @@ import { ENGINES } from '../public/js/data/engines.js';
 import { faultById, FAULTS } from '../public/js/data/faults.js';
 import { analyze } from '../public/js/features.js';
 import { synthesize } from '../public/js/synth.js';
-import { readWav } from './wav.mjs';
+import { AUDIO_FILE, readAudio } from './wav.mjs';
 
 const SECONDS = 4;
 const RECORDINGS = fileURLToPath(new URL('../recordings/', import.meta.url));
@@ -60,8 +60,15 @@ if (existsSync(RECORDINGS)) {
       if (!id.startsWith('.') && !id.endsWith('.md')) console.warn(`Skipping recordings/${id}: no fault has that id`);
       continue;
     }
-    real[id] = readdirSync(`${RECORDINGS}${id}`).filter((name) => name.endsWith('.wav')).map((name) => {
-      const print = analyze(readWav(`${RECORDINGS}${id}/${name}`));
+    real[id] = readdirSync(`${RECORDINGS}${id}`).filter((name) => AUDIO_FILE.test(name)).flatMap((name) => {
+      let samples;
+      try {
+        samples = readAudio(`${RECORDINGS}${id}/${name}`);
+      } catch (error) {
+        console.warn(`Skipping recordings/${id}/${name}: ${error.message}`);
+        return [];
+      }
+      const print = analyze(samples);
       realCount++;
       return {
         shape: list(print.shape, 1),

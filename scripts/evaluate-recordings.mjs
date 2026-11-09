@@ -2,15 +2,16 @@
 //
 //   node scripts/evaluate-recordings.mjs <folder> [--half-as-references]
 //
-// Name files after the fault, such as lifter-tick_004.wav. To map other names, edit ALIASES.
+// Either name files after the fault, such as lifter-tick_004.wav, or put them in folders named
+// after it, as in recordings/. To map other names, edit ALIASES. Any audio format works (see wav.mjs).
 // With --half-as-references, every other clip becomes a real reference and the rest are tested.
 // Use this before trusting any change to the analysis. Generated sounds can't tell you this.
-import { readdirSync } from 'node:fs';
+import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { faultById } from '../public/js/data/faults.js';
 import { analyze } from '../public/js/features.js';
 import { checkRecording, hearSound, rankFaults } from '../public/js/match.js';
-import { readWav } from './wav.mjs';
+import { AUDIO_FILE, readAudio } from './wav.mjs';
 
 const ALIASES = [
   [/belt/i, 'slipping-belt'],
@@ -29,16 +30,29 @@ if (!folder) {
 function faultFor(name) {
   const alias = ALIASES.find(([pattern]) => pattern.test(name));
   if (alias) return alias[1];
-  const id = name.replace(/[_-]?\d*\.wav$/i, '');
+  const id = name.replace(/[_-]?\d*\.[a-z0-9]+$/i, '');
   return faultById(id) ? id : null;
+}
+
+// Files at the top level are labeled by name; files inside a fault's folder by the folder.
+const files = [];
+for (const name of readdirSync(folder).sort()) {
+  const path = join(folder, name);
+  if (statSync(path).isDirectory()) {
+    if (!faultById(name)) continue;
+    for (const inner of readdirSync(path).filter((file) => AUDIO_FILE.test(file)).sort()) {
+      files.push({ path: join(path, inner), fault: name });
+    }
+  } else if (AUDIO_FILE.test(name)) {
+    files.push({ path, fault: faultFor(name) });
+  }
 }
 
 const clips = [];
 let skipped = 0;
-for (const name of readdirSync(folder).filter((file) => /\.wav$/i.test(file)).sort()) {
-  const fault = faultFor(name);
+for (const { path, fault } of files) {
   try {
-    const samples = readWav(join(folder, name));
+    const samples = readAudio(path);
     if (!fault || !checkRecording(samples).ok) {
       skipped++;
       continue;
