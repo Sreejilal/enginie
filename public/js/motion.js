@@ -18,7 +18,11 @@ export function swapView(change) {
   }
   document.documentElement.style.setProperty('--wash-x', `${lastPress.x}px`);
   document.documentElement.style.setProperty('--wash-y', `${lastPress.y}px`);
-  document.startViewTransition(change);
+  // Changing page again mid-transition skips the old one, which is fine. The page still changes,
+  // so there's no need to report it as an error.
+  const transition = document.startViewTransition(change);
+  transition.ready.catch(() => {});
+  transition.finished.catch(() => {});
 }
 
 /* ---------- Buttons: an ink blot spreads from your finger ---------- */
@@ -153,6 +157,7 @@ export function startWave(canvas, { engine: firstEngine, ink = '#1a1f8f' }) {
   let excitementTarget = 0;
   let nextDrop = 2;
   let pointerX = null;
+  let left = 0;
 
   // On arrival the ink pours in: it rises from below and sloshes as it settles.
   // It starts below zero so that the ink band underneath fills up first, then the surface rises.
@@ -164,11 +169,13 @@ export function startWave(canvas, { engine: firstEngine, ink = '#1a1f8f' }) {
   const shape = firingPattern(engineById(firstEngine));
   let target = firingPattern(engineById(firstEngine));
 
-  function resize() {
-    const box = canvas.getBoundingClientRect();
-    const ratio = Math.min(2, devicePixelRatio || 1);
+  // Called from the resize watcher, after layout, so measuring here costs nothing extra.
+  // Soft ribbons look the same at 1.5x as at 2x, and that's almost half the pixels to fill.
+  function resize(box) {
+    const ratio = Math.min(1.5, devicePixelRatio || 1);
     width = box.width;
     height = box.height;
+    left = canvas.getBoundingClientRect().left;
     canvas.width = Math.max(1, Math.round(width * ratio));
     canvas.height = Math.max(1, Math.round(height * ratio));
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
@@ -218,6 +225,7 @@ export function startWave(canvas, { engine: firstEngine, ink = '#1a1f8f' }) {
 
   const points = [];
   function draw() {
+    if (!nodes) return;
     context.clearRect(0, 0, width, height);
     updateSmooth();
     const cycles = Math.max(1.1, width / 620);
@@ -312,20 +320,20 @@ export function startWave(canvas, { engine: firstEngine, ink = '#1a1f8f' }) {
   }
 
   function onPointerMove(event) {
-    const x = event.clientX - canvas.getBoundingClientRect().left;
+    const x = event.clientX - left;
     if (pointerX !== null) push(x, Math.min(4.5, Math.abs(x - pointerX) * 0.11), 4);
     pointerX = x;
   }
   const onPointerLeave = () => { pointerX = null; };
-  const onPointerDown = (event) => push(event.clientX - canvas.getBoundingClientRect().left, -15, 7);
+  const onPointerDown = (event) => push(event.clientX - left, -15, 7);
 
   const host = canvas.parentElement;
   host.addEventListener('pointermove', onPointerMove, { passive: true });
   host.addEventListener('pointerleave', onPointerLeave, { passive: true });
   host.addEventListener('pointerdown', onPointerDown, { passive: true });
 
-  const sizeWatcher = new ResizeObserver(() => {
-    resize();
+  const sizeWatcher = new ResizeObserver(([entry]) => {
+    resize(entry.contentRect);
     if (!running) draw();
   });
   sizeWatcher.observe(canvas);
@@ -341,9 +349,7 @@ export function startWave(canvas, { engine: firstEngine, ink = '#1a1f8f' }) {
     else if (canvas.getBoundingClientRect().bottom > 0) start();
   };
   document.addEventListener('visibilitychange', onVisibility);
-
-  resize();
-  draw();
+  // The resize watcher gives the first size and draws before the first paint.
 
   return {
     setEngine(id) {

@@ -4,6 +4,7 @@ import { engineById, ENGINES } from '../data/engines.js';
 import { SAMPLE_RATE } from '../features.js';
 import { watchReveals } from '../motion.js';
 import { $, $$, engineOptions, escapeHtml, stopAllPlayback, togglePlayback } from '../shared.js';
+import { paintSampleBars } from '../soundview.js';
 import { synthesize } from '../synth.js';
 
 const COMPARE_RPM = 720;
@@ -43,31 +44,18 @@ function firingDiagram(engine) {
 
 /** The first half second of the sound as a shape, at the same engine speed for every engine. */
 function drawWaveform(canvas, id) {
-  const samples = engineSound(id, SHOWN_SECONDS + 0.1);
-  const box = canvas.getBoundingClientRect();
-  const ratio = Math.min(2, devicePixelRatio || 1);
-  canvas.width = Math.max(1, Math.round(box.width * ratio));
-  canvas.height = Math.max(1, Math.round(box.height * ratio));
-  const context = canvas.getContext('2d');
-  context.clearRect(0, 0, canvas.width, canvas.height);
+  // Waits for layout to give the canvas its size, rather than forcing a layout of the whole page.
+  const watcher = new ResizeObserver(([entry]) => {
+    watcher.disconnect();
+    if (canvas.isConnected) paintWaveform(canvas, id, entry.contentRect);
+  });
+  watcher.observe(canvas);
+}
 
-  const count = Math.floor(SHOWN_SECONDS * SAMPLE_RATE);
-  let peak = 0;
-  for (let i = 0; i < count; i++) peak = Math.max(peak, Math.abs(samples[i]));
-  const middle = canvas.height / 2;
-  const scale = (canvas.height * 0.48) / (peak || 1);
-  context.fillStyle = '#1a1f8f';
-  for (let x = 0; x < canvas.width; x++) {
-    const from = Math.floor((x / canvas.width) * count);
-    const to = Math.max(from + 1, Math.floor(((x + 1) / canvas.width) * count));
-    let low = 0;
-    let high = 0;
-    for (let i = from; i < to; i++) {
-      low = Math.min(low, samples[i]);
-      high = Math.max(high, samples[i]);
-    }
-    context.fillRect(x, middle - high * scale, 1, Math.max(1, (high - low) * scale));
-  }
+function paintWaveform(canvas, id, box) {
+  // The same rounded bars as every other sound display, so each firing pulse is a burst of bars.
+  const samples = engineSound(id, SHOWN_SECONDS + 0.1);
+  paintSampleBars(canvas, box, samples, Math.floor(SHOWN_SECONDS * SAMPLE_RATE));
 }
 
 function sideHtml(side, chosen) {

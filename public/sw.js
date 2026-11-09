@@ -1,7 +1,8 @@
 // Keeps Enginie working offline, such as in a garage with no signal. It always tries the network
 // first so that updates arrive straight away, and falls back to the saved copy when offline.
 
-const CACHE = 'enginie-v2';
+// Bump the version whenever this list changes. Every file in it must exist, or nothing is saved.
+const CACHE = 'enginie-v4';
 const FILES = [
   './',
   'index.html',
@@ -12,11 +13,12 @@ const FILES = [
   'js/app.js',
   'js/audio.js',
   'js/cost.js',
+  'js/dropdown.js',
   'js/features.js',
   'js/match.js',
   'js/motion.js',
-  'js/prints.js',
   'js/shared.js',
+  'js/soundview.js',
   'js/store.js',
   'js/synth.js',
   'js/data/engines.js',

@@ -21,7 +21,23 @@ function toBase64(bytes) {
   return btoa(binary);
 }
 
-const encodeImage = ({ image }) => ({ columns: image.columns, rows: image.rows, data: toBase64(image.data) });
+/** Packs two pixels into each byte at 16 shades. Smoothing on screen hides the difference. */
+function packShades(data) {
+  const packed = new Uint8Array(Math.ceil(data.length / 2));
+  for (let i = 0; i < data.length; i++) {
+    const shade = Math.round(data[i] / 17);
+    packed[i >> 1] |= i % 2 === 0 ? shade << 4 : shade;
+  }
+  return packed;
+}
+
+const encodeImage = ({ image, seconds }) => ({
+  columns: image.columns,
+  rows: image.rows,
+  seconds,
+  shades: toBase64(packShades(image.data)),
+  levels: toBase64(image.levels),
+});
 const list = (values, places) => Array.from(values, (value) => Number(value.toFixed(places)));
 
 const faultImages = {};

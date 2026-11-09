@@ -73,10 +73,21 @@ const commonness = (id) => {
 
 /** Reads the database file: a picture for each sound, plus any real reference recordings. */
 export function parseDatabase(file) {
-  const decode = (image) => ({
-    ...image,
-    data: Uint8Array.from(atob(image.data), (char) => char.charCodeAt(0)),
-  });
+  const bytes = (text) => {
+    const binary = atob(text);
+    const out = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
+    return out;
+  };
+  // Pictures are stored two pixels to a byte, at 16 shades each.
+  const decode = ({ shades, levels, ...image }) => {
+    const packed = bytes(shades);
+    const data = new Uint8Array(image.columns * image.rows);
+    for (let i = 0; i < data.length; i++) {
+      data[i] = 17 * (i % 2 === 0 ? packed[i >> 1] >> 4 : packed[i >> 1] & 15);
+    }
+    return { ...image, data, levels: bytes(levels) };
+  };
   const realPrints = new Map();
   for (const [id, takes] of Object.entries(file.real ?? {})) {
     realPrints.set(id, takes.map((print) => ({

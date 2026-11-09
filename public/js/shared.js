@@ -4,6 +4,7 @@ import { play, stopPlayback } from './audio.js';
 import { ENGINES } from './data/engines.js';
 import { AREAS, FAULTS } from './data/faults.js';
 import { parseDatabase } from './match.js';
+import { stopPlayheads } from './soundview.js';
 import * as store from './store.js';
 
 export const state = {
@@ -97,14 +98,21 @@ export async function deleteRecording(id) {
 
 /* ---------- Playback buttons ---------- */
 
+// Round icon buttons (marked `data-icon`) keep their icon and change only their spoken label.
+function labelButton(button, text) {
+  if ('icon' in button.dataset) button.setAttribute('aria-label', text);
+  else button.textContent = text;
+}
+
 function resetPlayButton(button) {
-  button.textContent = button.dataset.label;
+  labelButton(button, button.dataset.label);
   button.dataset.playing = 'false';
   button.setAttribute('aria-pressed', 'false');
 }
 
 export function stopAllPlayback() {
   stopPlayback();
+  stopPlayheads();
   if (state.playingButton) resetPlayButton(state.playingButton);
   state.playingButton = null;
 }
@@ -119,7 +127,7 @@ export async function togglePlayback(button, getSamples, onFinished = () => {}) 
   }
 
   state.playingButton = button;
-  button.textContent = button.dataset.playingLabel ?? 'Stop';
+  labelButton(button, button.dataset.playingLabel ?? 'Stop');
   button.dataset.playing = 'true';
   button.setAttribute('aria-pressed', 'true');
   await play(getSamples(), () => {

@@ -13,6 +13,8 @@ export const AREAS = [
   'Brakes',
   'Wheels and suspension',
   'Transmission and axle',
+  'Heating and cabin',
+  'Normal sounds',
 ];
 
 export const FAULTS = [

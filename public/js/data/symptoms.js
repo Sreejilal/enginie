@@ -15,6 +15,8 @@ export const SOUND_WORDS = {
   clunk: 'Clunk or bang',
   ping: 'Metallic pinging',
   puff: 'Puffing or chuffing',
+  creak: 'Creak or squeak',
+  whistle: 'Whistle',
 };
 
 export const CONTEXTS = {
@@ -26,7 +28,9 @@ export const CONTEXTS = {
   braking: 'braking',
   turning: 'turning',
   bumps: 'going over bumps',
-  ac: 'the A/C is on',
+  shifting: 'shifting gear or into drive',
+  ac: 'the A/C or fan is on',
+  shutdown: 'after switching off',
 };
 
 export const LOCATIONS = {
@@ -34,6 +38,7 @@ export const LOCATIONS = {
   under: 'Under the vehicle',
   wheel: 'A wheel',
   rear: 'The rear',
+  cabin: 'Inside, or behind the dashboard',
 };
 
 export const FOLLOWS = {

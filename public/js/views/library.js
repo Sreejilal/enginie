@@ -3,8 +3,9 @@
 import { moneyRange, shopCost } from '../cost.js';
 import { AREAS, faultById, FAULTS } from '../data/faults.js';
 import { CONTEXTS } from '../data/symptoms.js';
+import { SAMPLE_RATE } from '../features.js';
 import { watchReveals } from '../motion.js';
-import { drawImage } from '../prints.js';
+import { showSound, viewFor, voiceNoteHtml } from '../soundview.js';
 import {
   $, $$, databaseReady, deleteRecording, escapeHtml, state, stopAllPlayback, togglePlayback,
 } from '../shared.js';
@@ -48,9 +49,9 @@ export function renderLibrary(main) {
       : '';
     return `
       <li class="fault-row">
-        <button class="btn fault-play" type="button" data-play="${fault.id}" data-label="Play" aria-label="Play the ${escapeHtml(fault.name.toLowerCase())} example" data-ink>Play</button>
+        <button class="vn-play fault-play" type="button" data-play="${fault.id}" data-icon data-label="Play the ${escapeHtml(fault.name.toLowerCase())} example" aria-label="Play the ${escapeHtml(fault.name.toLowerCase())} example" aria-pressed="false"><span class="play-icon" aria-hidden="true"></span></button>
         <a class="fault-link" href="#/fault/${fault.id}">
-          <canvas class="fault-thumb" data-id="${fault.id}" aria-hidden="true"></canvas>
+          <span class="sound-frame fault-thumb"><canvas data-id="${fault.id}" aria-hidden="true"></canvas></span>
           <span class="fault-text">
             <span class="fault-name">${escapeHtml(fault.name)}</span>
             <span class="fault-sound">${escapeHtml(fault.sound)}</span>
@@ -80,7 +81,7 @@ export function renderLibrary(main) {
     if (state.db) {
       $$('canvas[data-id]', list).forEach((canvas) => {
         const image = state.db.faultImages.get(canvas.dataset.id);
-        if (image) drawImage(canvas, image);
+        if (image) showSound(canvas, image, { compact: true, seconds: image.seconds });
       });
     }
   }
@@ -89,8 +90,16 @@ export function renderLibrary(main) {
   area.addEventListener('change', render);
   list.addEventListener('click', (event) => {
     const button = event.target.closest('[data-play]');
-    if (button) togglePlayback(button, () => simulatedTake(button.dataset.play));
+    if (button) playRow(button);
   });
+
+  // The dot runs along the row's bars while its example plays.
+  async function playRow(button) {
+    const samples = simulatedTake(button.dataset.play);
+    const view = viewFor($(`canvas[data-id="${button.dataset.play}"]`, list));
+    const started = await togglePlayback(button, () => samples, () => view?.stopPlayhead());
+    if (started) view?.playhead(samples.length / SAMPLE_RATE);
+  }
 
   render();
   databaseReady.then(() => { if (main.contains(list)) render(); }).catch(() => {});
@@ -113,8 +122,7 @@ export function renderFault(main, id) {
     <section class="ticket-row compare" aria-label="Example sound">
       <div class="field">
         <p class="field-label">Computer-generated example</p>
-        <canvas id="fault-print" aria-hidden="true"></canvas>
-        <button class="btn" type="button" data-play="example" data-label="Play the example" data-ink>Play the example</button>
+        ${voiceNoteHtml({ canvasId: 'fault-print', play: 'data-play="example"', label: 'Play the example', seconds: state.db?.faultImages.get(fault.id)?.seconds ?? 4 })}
       </div>
       <div class="field" id="saved-recordings"></div>
     </section>`;
@@ -151,7 +159,10 @@ export function renderFault(main, id) {
   const onClick = async (event) => {
     const example = event.target.closest('[data-play]');
     if (example) {
-      togglePlayback(example, () => simulatedTake(fault.id));
+      const samples = simulatedTake(fault.id);
+      const view = viewFor($('#fault-print', main));
+      const started = await togglePlayback(example, () => samples, () => view?.stopPlayhead());
+      if (started) view?.playhead(samples.length / SAMPLE_RATE);
       return;
     }
     const savedPlay = event.target.closest('[data-play-saved]');
@@ -176,7 +187,7 @@ export function renderFault(main, id) {
   databaseReady.then(() => {
     const canvas = $('#fault-print', main);
     const image = state.db.faultImages.get(fault.id);
-    if (canvas && image) drawImage(canvas, image);
+    if (canvas && image) showSound(canvas, image, { compact: true, seconds: image.seconds });
     renderSaved();
   }).catch(() => {});
 

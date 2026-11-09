@@ -74,7 +74,8 @@ test('the database file is up to date with the sounds and analysis', () => {
   // Must match build-database.mjs: the first fault, seed 1000, on an inline 4.
   const fresh = analyze(synthesize(FAULTS[0].id, { seed: 1000, duration: 4, engine: 'i4' }));
   const stored = db.faultImages.get(FAULTS[0].id);
-  const same = fresh.image.data.every((value, i) => Math.abs(value - stored.data[i]) <= 1);
+  // The file keeps 16 shades (steps of 17), so round the fresh picture the same way and allow one step.
+  const same = fresh.image.data.every((value, i) => Math.abs(17 * Math.round(value / 17) - stored.data[i]) <= 17);
   assert.ok(same, 'The database is out of date. Run "npm run build:database".');
 });
 

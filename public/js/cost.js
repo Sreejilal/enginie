@@ -19,7 +19,9 @@ export function diyCost(fault) {
   return { low: fault.parts[0], high: fault.parts[1] };
 }
 
-export const money = (value) => `$${Math.round(value).toLocaleString('en-US')}`;
+// Made once: building a number format on every call is slow, and pages show dozens of prices.
+const DOLLARS = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+export const money = (value) => `$${DOLLARS.format(Math.round(value))}`;
 export const moneyRange = ({ low, high }) => `${money(low)} to ${money(high)}`;
 
 /** Compares a quote with the typical range, for the quote checker. */

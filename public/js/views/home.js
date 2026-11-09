@@ -4,10 +4,10 @@ import { decodeFile, listMicrophones, MAX_FILE_SECONDS, startRecording } from '.
 import { engineById } from '../data/engines.js';
 import { faultById } from '../data/faults.js';
 import { CONTEXTS, FOLLOWS, LOCATIONS, RED_FLAGS, SOUND_WORDS } from '../data/symptoms.js';
-import { analyze, freqToPosition } from '../features.js';
-import { checkRecording, fitLabel, hearSound, MIN_SECONDS, PARTIAL_FIT, RANGES, rankFaults } from '../match.js';
+import { analyze, SAMPLE_RATE } from '../features.js';
+import { checkRecording, fitLabel, hearSound, MIN_SECONDS, PARTIAL_FIT, rankFaults } from '../match.js';
 import { magnetize, reducedMotion, splitLetters, startWave, watchReveals } from '../motion.js';
-import { attachReadout, drawImage, hideReadout, startLiveTrace } from '../prints.js';
+import { hideReadout, showSound, viewFor, voiceNoteHtml } from '../soundview.js';
 import {
   $, $$, databaseReady, engineOptions, escapeHtml, faultOptions, readPreference, realReferences,
   saveRecording, state, stopAllPlayback, togglePlayback, writePreference,
@@ -144,15 +144,18 @@ function template() {
       </div>
 
       <div class="recorder">
-        <div class="chart">
-          <div class="chart-y" id="chart-y" aria-hidden="true"></div>
-          <div class="chart-plot" id="chart-plot">
-            <canvas id="scope" role="img" aria-label="Sound print of the recording"></canvas>
-            <p class="chart-caption" id="scope-caption"></p>
+        <div class="scope">
+          <div class="scope-head">
+            <button class="vn-play" id="scope-play" type="button" data-icon data-label="Play this sound" aria-label="Play this sound" aria-pressed="false" hidden><span class="play-icon" aria-hidden="true"></span></button>
+            <p class="scope-caption" id="scope-caption"></p>
+            <span class="scope-time" data-clock aria-hidden="true"></span>
           </div>
-          <div class="chart-x" aria-hidden="true">
+          <div class="scope-screen">
+            <canvas id="scope" role="img" aria-label="Sound display of the recording"></canvas>
+          </div>
+          <div class="scope-foot" aria-hidden="true">
             <span>0 s</span>
-            <span class="chart-key">Quiet <span class="chart-key-ramp"></span> Loud</span>
+            <span class="scope-key">Taller is louder. Colour is pitch: <span class="pitch-key">Rumble <span class="pitch-ramp"></span> Hiss</span></span>
             <span id="chart-end">8 s</span>
           </div>
         </div>
@@ -269,6 +272,7 @@ export function renderHome(main) {
     goStatus: $('#go-status', main),
     scope: $('#scope', main),
     caption: $('#scope-caption', main),
+    scopePlay: $('#scope-play', main),
     chartEnd: $('#chart-end', main),
     level: $('#level', main),
     micName: $('#mic-name', main),
@@ -316,8 +320,11 @@ export function renderHome(main) {
     cleanups.push(() => clearInterval(cycle));
 
     // Scrolling stirs the ink, and the headline drifts up and away at its own pace.
-    const hero = $('.hero', main);
+    // Only these two elements move, using properties the browser can animate without relayout.
+    const title = $('.hero-title', main);
+    const foot = $('.hero-foot', main);
     let lastY = scrollY;
+    let lastLift = -1;
     let queued = false;
     const onScroll = () => {
       if (queued) return;
@@ -326,7 +333,13 @@ export function renderHome(main) {
         queued = false;
         const speed = Math.abs(scrollY - lastY);
         lastY = scrollY;
-        hero.style.setProperty('--lift', Math.min(1, scrollY / 520).toFixed(3));
+        const lift = Math.min(1, scrollY / 520);
+        if (lift !== lastLift) {
+          lastLift = lift;
+          title.style.translate = `0 ${(lift * -70).toFixed(1)}px`;
+          title.style.opacity = (1 - lift * 0.45).toFixed(3);
+          foot.style.translate = `0 ${(lift * -30).toFixed(1)}px`;
+        }
         if (speed > 2) wave.nudge(Math.min(6, speed * 0.07));
       });
     };
@@ -337,43 +350,39 @@ export function renderHome(main) {
 
   /* ---------- Recording chart ---------- */
 
-  (function setUpChart() {
-    const axis = $('#chart-y', main);
-    const plot = $('#chart-plot', main);
-    let bottom = 0;
-    for (const range of RANGES) {
-      const top = range.below === Infinity ? 1 : freqToPosition(range.below);
-      const label = document.createElement('span');
-      label.textContent = range.name;
-      label.style.bottom = `${((bottom + top) / 2) * 100}%`;
-      axis.append(label);
-      if (top < 1) {
-        const line = document.createElement('div');
-        line.className = 'chart-line';
-        line.style.bottom = `${top * 100}%`;
-        plot.append(line);
-      }
-      bottom = top;
-    }
-  })();
+  // What the big screen is showing, so its play button plays the right sound.
+  let scopeSource = null;
+
+  function restoreScope() {
+    if (session.recording) showRecordingOnChart();
+    else showExample();
+  }
 
   function showExample() {
     const image = state.db?.faultImages.get(EXAMPLE_FAULT);
     if (!image) return;
-    drawImage(el.scope, image);
-    el.caption.textContent = `Example: ${faultById(EXAMPLE_FAULT).name.toLowerCase()}, computer-generated`;
+    showSound(el.scope, image, { seconds: image.seconds });
+    el.caption.textContent = `Example: ${faultById(EXAMPLE_FAULT).name.toLowerCase()}`;
     el.caption.hidden = false;
-    el.chartEnd.textContent = '4 s';
+    el.scopePlay.hidden = false;
+    el.scopePlay.dataset.label = 'Play the example';
+    el.scopePlay.setAttribute('aria-label', 'Play the example');
+    scopeSource = 'example';
+    el.chartEnd.textContent = `${Math.round(image.seconds)} s`;
+    el.scope.setAttribute('aria-label', 'Example sound display of a rod knock: a heavy, regular beat low in the pitch range.');
   }
 
   function showRecordingOnChart() {
     const { print } = session.recording;
-    drawImage(el.scope, print.image);
+    showSound(el.scope, print.image, { seconds: print.seconds });
     el.caption.textContent = 'Your recording';
     el.caption.hidden = false;
+    el.scopePlay.hidden = false;
+    el.scopePlay.dataset.label = 'Play your recording';
+    el.scopePlay.setAttribute('aria-label', 'Play your recording');
+    scopeSource = 'recording';
     el.chartEnd.textContent = `${Math.round(print.seconds)} s`;
-    el.scope.setAttribute('aria-label', `Sound print of your recording. ${hearSound(print).label}.`);
-    attachReadout(el.scope, print.image, print.seconds);
+    el.scope.setAttribute('aria-label', `Sound display of your recording. ${hearSound(print).label}.`);
   }
 
   /* ---------- Phases and messages ---------- */
@@ -452,6 +461,7 @@ export function renderHome(main) {
     clearInterval(timerHandle);
     cancelAnimationFrame(meterFrame);
     stopTrace?.();
+    stopTrace = null;
     el.level.style.transform = 'scaleX(0)';
   }
 
@@ -478,8 +488,12 @@ export function renderHome(main) {
     el.micName.textContent = recorder.deviceLabel ? `Listening with ${recorder.deviceLabel}` : 'Microphone level';
     refreshMicrophones(recorder.deviceId);
     el.caption.hidden = true;
+    el.scopePlay.hidden = true;
+    scopeSource = null;
     el.chartEnd.textContent = `${RECORD_SECONDS} s`;
-    stopTrace = startLiveTrace(el.scope, recorder.analyser, recorder.sampleRate, RECORD_SECONDS);
+    el.scope.setAttribute('aria-label', 'Live sound display of the recording in progress.');
+    const screen = viewFor(el.scope) ?? showSound(el.scope, null);
+    stopTrace = screen.startLive(recorder.analyser, recorder.sampleRate, RECORD_SECONDS);
 
     loudestDb = -120;
     runMeter();
@@ -516,6 +530,7 @@ export function renderHome(main) {
     setTimer();
     if (!check.ok) {
       setPhase('idle');
+      restoreScope();
       if (check.problem === 'silent') {
         setStatus('');
         showMicHelp({ name: 'Silent' }, details.deviceLabel);
@@ -649,19 +664,32 @@ export function renderHome(main) {
     const recording = session.recording;
     const image = state.db?.faultImages.get(fault.id);
     const engine = engineById(session.answers.engine);
+    const onEngine = engine && !fault.onlyDiesel ? `, on your ${escapeHtml(engine.name)} engine type` : '';
     return `
       <section class="ticket-row compare" aria-label="Compare by ear">
         <div class="field">
           <p class="field-label">Your recording</p>
-          ${recording ? `
-            <canvas id="print-yours" role="img" aria-label="Sound print of your recording."></canvas>
-            <button class="btn" type="button" data-action="play-recording" data-label="Play your recording" data-ink>Play your recording</button>
-          ` : '<p>Record the noise above to see and hear it next to this example.</p>'}
+          ${recording ? voiceNoteHtml({
+            canvasId: 'print-yours',
+            canvasLabel: 'Sound display of your recording.',
+            play: 'data-action="play-recording"',
+            label: 'Play your recording',
+            seconds: recording.print.seconds,
+          }) : `
+            <div class="voice-note voice-note-empty">
+              <button class="vn-play vn-record" type="button" data-go="recorder" aria-label="Record the noise"><span class="record-dot" aria-hidden="true"></span></button>
+              <p>Record the noise to see it here, next to the example.</p>
+            </div>
+          `}
         </div>
         <div class="field">
-          <p class="field-label">Computer-generated example${engine && fault.id !== 'diesel-injector-knock' ? ` on a ${escapeHtml(engine.name)}` : ''}</p>
-          ${image ? '<canvas id="print-theirs" aria-hidden="true"></canvas>' : ''}
-          <button class="btn" type="button" data-action="play-sample" data-label="Play the example" data-ink>Play the example</button>
+          <p class="field-label">Computer-generated example${onEngine}</p>
+          ${image ? voiceNoteHtml({
+            canvasId: 'print-theirs',
+            play: 'data-action="play-sample"',
+            label: 'Play the example',
+            seconds: image.seconds,
+          }) : '<button class="btn" type="button" data-action="play-sample" data-label="Play the example" data-ink>Play the example</button>'}
         </div>
       </section>`;
   }
@@ -739,12 +767,11 @@ export function renderHome(main) {
 
     const yours = $('#print-yours', el.result);
     if (yours && session.recording) {
-      drawImage(yours, session.recording.print.image);
-      attachReadout(yours, session.recording.print.image, session.recording.print.seconds);
+      showSound(yours, session.recording.print.image, { compact: true, seconds: session.recording.print.seconds });
     }
     const theirs = $('#print-theirs', el.result);
     const image = state.db.faultImages.get(fault.id);
-    if (theirs && image) drawImage(theirs, image);
+    if (theirs && image) showSound(theirs, image, { compact: true, seconds: image.seconds });
 
     if (moveFocus) {
       el.result.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' });
@@ -761,11 +788,17 @@ export function renderHome(main) {
     }
     const button = event.target.closest('[data-action]');
     if (!button) return;
+    // A glowing line sweeps across the matching display while each sound plays.
+    const sweep = async (canvasId, samples) => {
+      const view = viewFor($(`#${canvasId}`, el.result));
+      const started = await togglePlayback(button, () => samples, () => view?.stopPlayhead());
+      if (started) view?.playhead(samples.length / SAMPLE_RATE);
+    };
     if (button.dataset.action === 'play-recording' && session.recording) {
-      togglePlayback(button, () => session.recording.samples);
+      sweep('print-yours', session.recording.samples);
     } else if (button.dataset.action === 'play-sample') {
       const id = session.selectedId ?? currentRanking()[0].fault.id;
-      togglePlayback(button, () => simulatedTake(id, session.answers.engine));
+      sweep('print-theirs', simulatedTake(id, session.answers.engine));
     }
   });
 
@@ -839,6 +872,15 @@ export function renderHome(main) {
         () => wave.setExcited(false),
       );
     });
+  });
+
+  // The big screen's own play button, like the one on a voice message.
+  el.scopePlay.addEventListener('click', async () => {
+    if (!scopeSource) return;
+    const samples = scopeSource === 'recording' && session.recording ? session.recording.samples : simulatedTake(EXAMPLE_FAULT);
+    const view = viewFor(el.scope);
+    const started = await togglePlayback(el.scopePlay, () => samples, () => view?.stopPlayhead());
+    if (started) view?.playhead(samples.length / SAMPLE_RATE);
   });
 
   main.addEventListener('click', (event) => {

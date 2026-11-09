@@ -30,7 +30,9 @@ const MOD_MAX_HZ = 200; // High enough to see the firing rate of any engine at i
 const BEAT_RANGE = [1, 20]; // Slow enough to hear as separate beats.
 const FIRING_RANGE = [20, 130]; // Fast enough to blur into an engine's note.
 const IMAGE_COLUMNS = 160;
+const IMAGE_ROWS = 48; // Finer than the analysis bands, because people look at this.
 const IMAGE_RANGE_DB = 60;
+const LEVEL_RANGE_DB = 45;
 
 /** Standard second-order audio filter. */
 export function biquad(input, type, hz, q, rate = SAMPLE_RATE) {
@@ -150,12 +152,12 @@ function fft(re, im) {
   }
 }
 
-const BAND_FILTERS = (() => {
+function buildFilters(count) {
   const edges = Array.from(
-    { length: BAND_COUNT + 2 },
-    (_, i) => fromScale(SCALE_MIN + (i / (BAND_COUNT + 1)) * (SCALE_MAX - SCALE_MIN)),
+    { length: count + 2 },
+    (_, i) => fromScale(SCALE_MIN + (i / (count + 1)) * (SCALE_MAX - SCALE_MIN)),
   );
-  return Array.from({ length: BAND_COUNT }, (_, band) => {
+  return Array.from({ length: count }, (_, band) => {
     const [low, mid, high] = [edges[band], edges[band + 1], edges[band + 2]];
     const weights = [];
     for (let bin = 1; bin < BINS; bin++) {
@@ -170,10 +172,13 @@ const BAND_FILTERS = (() => {
       weights: Float64Array.from(weights, ([, weight]) => weight / total),
     };
   });
-})();
+}
 
-function bandEnergy(band, power) {
-  const { bins, weights } = BAND_FILTERS[band];
+const BAND_FILTERS = buildFilters(BAND_COUNT);
+const IMAGE_FILTERS = buildFilters(IMAGE_ROWS);
+
+function bandEnergy(band, power, filters = BAND_FILTERS) {
+  const { bins, weights } = filters[band];
   let energy = 0;
   for (let i = 0; i < bins.length; i++) energy += power[bins[i]] * weights[i];
   return energy;
@@ -359,7 +364,8 @@ export function analyze(samples) {
   const re = new Float64Array(FRAME);
   const im = new Float64Array(FRAME);
   const meanPower = new Float64Array(BINS);
-  const bandDb = new Float32Array(frames * BAND_COUNT);
+  const imageDb = new Float32Array(frames * IMAGE_ROWS);
+  const frameDb = new Float32Array(frames);
 
   for (let t = 0; t < frames; t++) {
     const offset = t * HOP;
@@ -368,13 +374,16 @@ export function analyze(samples) {
       im[i] = 0;
     }
     fft(re, im);
+    let total = 0;
     for (let bin = 0; bin < BINS; bin++) {
       const power = re[bin] * re[bin] + im[bin] * im[bin];
       im[bin] = power; // Reuse the array to hold this frame's power spectrum.
       meanPower[bin] += power;
+      total += power;
     }
-    for (let band = 0; band < BAND_COUNT; band++) {
-      bandDb[t * BAND_COUNT + band] = 10 * Math.log10(bandEnergy(band, im) + 1e-12);
+    frameDb[t] = 10 * Math.log10(total + 1e-12);
+    for (let row = 0; row < IMAGE_ROWS; row++) {
+      imageDb[t * IMAGE_ROWS + row] = 10 * Math.log10(bandEnergy(row, im, IMAGE_FILTERS) + 1e-12);
     }
   }
   for (let bin = 0; bin < BINS; bin++) meanPower[bin] /= frames;
@@ -413,31 +422,43 @@ export function analyze(samples) {
     firingStrength: firing.strength,
     loudest: loudestRange(meanPower),
     seconds: samples.length / SAMPLE_RATE,
-    image: buildImage(bandDb, frames),
+    image: buildImage(imageDb, frameDb, frames),
   };
 }
 
-/** Shrinks the time-frequency data into a small picture of the sound. */
-function buildImage(bandDb, frames) {
+/**
+ * Shrinks the sound into a small picture: a grid of how loud each pitch is over time, plus a
+ * loudness line across the whole sound. Both are scaled to the sound's own loudest moment,
+ * so a quiet microphone draws as clearly as a loud one.
+ */
+function buildImage(imageDb, frameDb, frames) {
   const columns = Math.min(IMAGE_COLUMNS, frames);
-  const data = new Uint8Array(columns * BAND_COUNT);
+  const data = new Uint8Array(columns * IMAGE_ROWS);
+  const levels = new Uint8Array(columns);
   let top = -Infinity;
-  for (let i = 0; i < bandDb.length; i++) if (bandDb[i] > top) top = bandDb[i];
+  for (let i = 0; i < imageDb.length; i++) if (imageDb[i] > top) top = imageDb[i];
+  let loudest = -Infinity;
+  for (let t = 0; t < frames; t++) if (frameDb[t] > loudest) loudest = frameDb[t];
 
   for (let column = 0; column < columns; column++) {
     const from = Math.floor((column / columns) * frames);
     const to = Math.max(from + 1, Math.floor(((column + 1) / columns) * frames));
-    for (let band = 0; band < BAND_COUNT; band++) {
+    let columnPeak = -Infinity;
+    for (let t = from; t < to; t++) if (frameDb[t] > columnPeak) columnPeak = frameDb[t];
+    const level = (columnPeak - (loudest - LEVEL_RANGE_DB)) / LEVEL_RANGE_DB;
+    levels[column] = Math.round(255 * Math.min(1, Math.max(0, level)));
+
+    for (let row = 0; row < IMAGE_ROWS; row++) {
       let peak = -Infinity;
       for (let t = from; t < to; t++) {
-        const value = bandDb[t * BAND_COUNT + band];
+        const value = imageDb[t * IMAGE_ROWS + row];
         if (value > peak) peak = value;
       }
-      const level = (peak - (top - IMAGE_RANGE_DB)) / IMAGE_RANGE_DB;
-      data[column * BAND_COUNT + band] = Math.round(255 * Math.min(1, Math.max(0, level)));
+      const shade = (peak - (top - IMAGE_RANGE_DB)) / IMAGE_RANGE_DB;
+      data[column * IMAGE_ROWS + row] = Math.round(255 * Math.min(1, Math.max(0, shade)));
     }
   }
-  return { columns, rows: BAND_COUNT, data };
+  return { columns, rows: IMAGE_ROWS, data, levels };
 }
 
 const rmsDifference = (a, b) => {
