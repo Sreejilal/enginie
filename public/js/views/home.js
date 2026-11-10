@@ -635,7 +635,7 @@ export function renderHome(main) {
 
   function candidateRow(entry, selected) {
     const { fault } = entry;
-    const label = entry.realMatch?.score >= REAL_MATCH ? 'Matches a real recording' : fitLabel(entry.fit);
+    const label = entry.realMatch?.counted && entry.realMatch.score >= REAL_MATCH ? 'Matches a real recording' : fitLabel(entry.fit);
     return `
       <li>
         <button class="candidate ${selected ? 'is-selected' : ''}" type="button" data-select="${fault.id}" aria-pressed="${selected}" data-ink>
@@ -755,7 +755,7 @@ export function renderHome(main) {
         afterRepair: session.answers.afterRepair,
         animate,
         extra: compareSection(fault),
-        note: selected.realMatch?.score >= REAL_MATCH
+        note: selected.realMatch?.counted && selected.realMatch.score >= REAL_MATCH
           ? '<p class="score-note">This closely matches a real recording of this fault, which is the most reliable evidence we have.</p>'
           : '',
       })}

@@ -3,7 +3,7 @@
 // We tested this on real phone recordings. Comparing a recording with computer-generated sounds
 // did no better than guessing, so generated sounds play no part in the ranking. What did hold up:
 //   - simple measurements (is there a clear tone? a slow regular tap?)
-//   - real reference recordings, which were right about 89% of the time
+//   - real reference recordings of the same faults, which were right about 90% of the time
 //   - when and where the noise happens, which published research also found to matter as much
 //     as the sound itself
 
@@ -54,7 +54,11 @@ const ANSWERS_WEIGHT = 3;
 const HEARD_MISFIT = 15;
 const HEARD_ALONE_LIMIT = 0.6;
 const COMMON_BONUS = 6;
-const REAL_TRUST = 80;
+// A real recording only counts if it's at least this similar, and then adds at most REAL_BONUS.
+// Letting a close real match override everything made results worse on a mixed set of real
+// recordings: a clip of one fault would often sit closest to a recording of another.
+const REAL_FLOOR = 65;
+const REAL_BONUS = 60;
 
 // How much each answer tells us. The sound word and what it follows are the most telling.
 const WEIGHTS = { words: 3, contexts: 2, follows: 2, where: 1 };
@@ -149,15 +153,29 @@ function bestRealMatch(print, references) {
 }
 
 /**
- * Ranks every fault. Real recordings count most when there are any, because they're the only
- * sound comparison that has held up. `saved` maps fault ids to prints from real recordings.
+ * Ranks every fault. `saved` maps fault ids to prints from real recordings. Only the fault whose
+ * real recording sounds closest gets a boost, and only as far as the answers agree with it, so
+ * a lopsided set of recordings (all healthy engines, say) can't bury what the answers point to.
  */
 export function rankFaults({ print = null, answers = {}, saved = new Map() } = {}) {
   const engine = answers.engine ?? null;
   const heard = print ? hearSound(print) : null;
   const ruledOut = (fault) => fault.onlyDiesel && engine && !DIESEL_ENGINES.includes(engine);
+  const eligible = FAULTS.filter((fault) => !ruledOut(fault));
 
-  const ranking = FAULTS.filter((fault) => !ruledOut(fault)).map((fault) => {
+  const realMatches = new Map();
+  let closest = null;
+  if (print) {
+    for (const fault of eligible) {
+      if (!saved.has(fault.id)) continue;
+      const match = bestRealMatch(print, saved.get(fault.id));
+      if (!match) continue;
+      realMatches.set(fault.id, match);
+      if (match.score >= REAL_FLOOR && (closest === null || match.score > realMatches.get(closest).score)) closest = fault.id;
+    }
+  }
+
+  const ranking = eligible.map((fault) => {
     const symptoms = symptomScore(fault, answers);
     const heardFit = heard
       ? (fault.words.some((word) => heard.words.includes(word)) ? 100 : HEARD_MISFIT)
@@ -174,20 +192,22 @@ export function rankFaults({ print = null, answers = {}, saved = new Map() } = {
       fit = heardFit * HEARD_ALONE_LIMIT;
     }
 
-    // A close match with a real recording beats everything else, unless the answers disagree.
-    const real = print && saved.has(fault.id) ? bestRealMatch(print, saved.get(fault.id)) : null;
-    const trusted = real && real.score >= REAL_TRUST;
-    const agreement = symptoms === null ? 1 : 0.5 + symptoms / 200;
+    // The closest real recording adds to the evidence, scaled by how well the answers fit. It
+    // can't overrule the words someone chose for the sound, so a saved healthy engine can't
+    // outrank the knock they described.
+    const match = realMatches.get(fault.id) ?? null;
+    const words = answers.words ?? [];
+    const saidOtherwise = words.length > 0 && !fault.words.some((word) => words.includes(word));
+    const counted = fault.id === closest && !saidOtherwise;
+    const boost = counted ? REAL_BONUS * (symptoms === null ? 1 : symptoms / 100) : 0;
 
     return {
       fault,
-      fit: trusted ? Math.max(fit, real.score * agreement) : fit,
+      fit: Math.min(100, fit + boost),
       symptomScore: symptoms,
       heardFit,
-      realMatch: real,
-      sortScore: trusted
-        ? 100 + real.score * agreement
-        : fit + commonness(fault.id) * COMMON_BONUS,
+      realMatch: match && { ...match, counted },
+      sortScore: fit + boost + commonness(fault.id) * COMMON_BONUS,
     };
   });
   return ranking.sort((a, b) => b.sortScore - a.sortScore);

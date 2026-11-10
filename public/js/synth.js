@@ -399,6 +399,16 @@ const RECIPES = {
     return mix(grind, motor, 0.12);
   },
 
+  // The starter slows and strains on each compression stroke, then the engine never fires.
+  'cranks-no-start': (n, r) => {
+    const pulseHz = r.range(4, 8);
+    const motor = tone(n, r, { hz: r.range(180, 320), partials: [1, 0.6, 0.4, 0.25], wobbleHz: pulseHz, wobble: 0.06 });
+    shape(motor, (t) => 0.45 + 0.55 * Math.sin(Math.PI * pulseHz * t) ** 2);
+    const chuff = noiseBand(n, r, 'lowpass', r.range(250, 500), 0.7, 0.5);
+    shape(chuff, (t) => Math.sin(Math.PI * pulseHz * t) ** 8);
+    return mix(chuff, motor, 0.25);
+  },
+
   // Brakes
 
   'worn-brake-pads': (n, r, engine) => {
@@ -579,7 +589,7 @@ export const hasSound = (id) => id in RECIPES;
 
 // Faults that sound the same whatever engine is fitted, so they only need a few takes.
 const ENGINE_INDEPENDENT = new Set([
-  'fuel-pump-whine', 'starter-clicking', 'starter-grind', 'wheel-bearing', 'tire-cupping',
+  'fuel-pump-whine', 'starter-clicking', 'starter-grind', 'cranks-no-start', 'wheel-bearing', 'tire-cupping',
   'suspension-clunk', 'loose-wheel', 'differential-howl', 'suspension-creak', 'u-joint',
   'blower-motor', 'blend-door-actuator', 'dash-rattle', 'wind-whistle', 'hot-exhaust-ticking',
   'fan-after-shutoff', 'abs-self-test',

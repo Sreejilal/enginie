@@ -21,23 +21,24 @@ export function renderAbout(main) {
 
     <section class="help-section" data-reveal aria-labelledby="tested-title">
       <h2 id="tested-title">What happened when we tested it</h2>
-      <p class="section-lede">We tested Enginie on 80 real phone recordings of small petrol cars that it had never heard before. They covered four conditions: healthy, misfire, tappet noise and belt noise. Each time, it had to choose from all 32 faults Enginie covered at the time.</p>
+      <p class="section-lede">We tested Enginie on 80 real phone recordings of small petrol cars that it had never heard before. They covered four conditions: healthy, misfire, tappet noise and belt noise. Each time, it had to choose from all 44 faults Enginie covers.</p>
       <div class="table-wrap">
         <table class="evidence">
           <thead>
             <tr><th scope="col">Method</th><th scope="col">Top answer right</th><th scope="col">Right fault in top three</th></tr>
           </thead>
           <tbody>
-            <tr><th scope="row">Random guessing</th><td>3%</td><td>10%</td></tr>
+            <tr><th scope="row">Random guessing</th><td>2%</td><td>7%</td></tr>
             <tr><th scope="row">Your recording plus basic answers</th><td>41%</td><td>63%</td></tr>
-            <tr><th scope="row">Your recording, compared with real recordings of those faults</th><td>83%</td><td>98%</td></tr>
+            <tr><th scope="row">Your recording, compared with real recordings of those faults</th><td>91%</td><td>98%</td></tr>
           </tbody>
         </table>
       </div>
       <ul class="dash-list">
         <li><strong>Only 4 of the ${FAULTS.length} faults could be tested</strong> on real recordings. The rest rely on mechanical knowledge and haven’t been tested this way, including all the brake and wheel faults and rod knock.</li>
-        <li><strong>Some of the recordings may come from the same cars,</strong> which would make the 83% look better than it is. It shows what’s possible, not a promise.</li>
-        <li><strong>The site doesn’t include those real recordings,</strong> because their license isn’t clear. So the 83% row only applies once you’ve saved real recordings of your own. Until then, expect something closer to the middle row.</li>
+        <li><strong>Some of the recordings may come from the same cars,</strong> which would make the 91% look better than it is. It shows what’s possible, not a promise.</li>
+        <li><strong>The site doesn’t include those real recordings,</strong> because their license isn’t clear. So the 91% row only applies once you’ve saved real recordings of your own. Until then, expect something closer to the middle row.</li>
+        <li><strong>A real recording gives a boost, not the final word.</strong> Only the fault whose recording sounds closest gets it, and only as far as your answers agree. We used to let a close real match override everything, but on a second, mixed set of 38 real recordings covering 16 faults, that put the right fault in the top three less often. A clip of one fault often sounded closest to a recording of a different one.</li>
         <li><strong>Misfires were the hardest to measure.</strong> They read as an uneven beat only about 40% of the time, so trust a code reader over this site for misfires.</li>
       </ul>
       <p>For comparison, a <a href="https://arxiv.org/abs/1911.02073" rel="noopener">published study of the same idea</a> got the top answer right 59% of the time, and had it in the top three 83% of the time, choosing from 12 faults. People with no tool at all got 37%.</p>

@@ -183,6 +183,39 @@ test('a close match with a real recording goes to the top', () => {
   const [top] = rankFaults({ print: again, saved });
   assert.equal(top.fault.id, 'lifter-tick');
   assert.ok(top.realMatch.score > 80);
+  assert.ok(top.realMatch.counted);
+});
+
+test('only the closest real recording counts', () => {
+  const saved = new Map([
+    ['lifter-tick', [{ print: analyze(clicks(6)), origin: 'saved' }]],
+    ['rod-knock', [{ print: analyze(clicks(2.5)), origin: 'saved' }]],
+  ]);
+  const ranking = rankFaults({ print: analyze(clicks(6.1)), saved });
+  const entry = (id) => ranking.find((item) => item.fault.id === id);
+  assert.equal(ranking[0].fault.id, 'lifter-tick');
+  assert.equal(entry('lifter-tick').realMatch.counted, true);
+  assert.equal(entry('rod-knock').realMatch.counted, false);
+});
+
+test('a real recording can’t overrule answers that point elsewhere', () => {
+  const saved = new Map([['lifter-tick', [{ print: analyze(clicks(6)), origin: 'saved' }]]]);
+  const answers = { words: ['squeal'], contexts: ['braking'], where: 'wheel', follows: 'road' };
+  const [top] = rankFaults({ print: analyze(clicks(6.1)), answers, saved });
+  assert.equal(top.fault.id, 'worn-brake-pads');
+});
+
+test('a saved healthy engine can’t bury a knock someone described', () => {
+  // A steady sound that closely matches a saved healthy recording, while the owner says knock.
+  const steady = noise(6, 0.3);
+  assert.equal(hearSound(analyze(steady)).kind, 'steady');
+  const saved = new Map([['healthy-engine', [{ print: analyze(noise(6, 0.3, 2)), origin: 'saved' }]]]);
+  const answers = { words: ['knock'], contexts: ['idling'], where: 'engine', follows: 'engine' };
+  const ranking = rankFaults({ print: analyze(steady), answers, saved });
+  const place = (id) => ranking.findIndex((entry) => entry.fault.id === id);
+  assert.ok(ranking[0].fault.words.includes('knock'));
+  assert.ok(place('rod-knock') < place('healthy-engine'));
+  assert.equal(ranking[place('healthy-engine')].realMatch.counted, false);
 });
 
 test('choosing a petrol engine rules out diesel-only faults', () => {

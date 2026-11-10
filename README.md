@@ -17,7 +17,7 @@ Phones only allow the microphone on `https`, so to record on a phone the site ne
 ## What’s in it
 
 - **Check a noise:** record it, upload a clip, or answer a few questions. You get the top three possibilities, each with whether you can keep driving, rough US costs, what to try first and what to tell the mechanic.
-- **Sound database:** 43 faults across the engine, exhaust, accessories, brakes, wheels, drivetrain and cabin, plus common sounds that are perfectly normal.
+- **Sound database:** 44 faults across the engine, exhaust, accessories, brakes, wheels, drivetrain and cabin, plus common sounds that are perfectly normal.
 - **Engines:** why a V8, an inline 6 and others sound different, generated from their real firing orders.
 - **Dealing with the shop:** a quote checker, what to do before you approve work, what to do when it’s worse after a repair, and how to spend less.
 - **Mechanic mode:** sound signatures, confirmation tests, likely codes and typical book times.
@@ -28,15 +28,15 @@ This was tested on real phone recordings the site had never heard, covering 4 fa
 
 | Method | Top answer right | Right fault in top three |
 | --- | --- | --- |
-| Random guessing, among 32 faults | 3% | 10% |
+| Random guessing, among 44 faults | 2% | 7% |
 | Recording plus basic answers | 41% | 63% |
-| Recording, compared with real recordings of those faults | 83% | 98% |
+| Recording, compared with real recordings of those faults | 91% | 98% |
 
 Things to know:
 
-- Only 4 of the 43 faults could be tested this way, so the rest rely on mechanical knowledge.
+- Only 4 of the 44 faults could be tested this way, so the rest rely on mechanical knowledge.
 - Comparing real recordings with computer-generated sounds did no better than guessing. That’s why generated sounds are only for listening, and play no part in the results.
-- Real recordings are what make it accurate. Recordings saved from the results page count heavily in future matches.
+- Real recordings are what make it accurate. The fault whose real recording sounds closest gets a capped boost, scaled by how well the answers fit, and never against the sound words someone picked. Letting a close match override everything made results worse on a mixed set of 38 real recordings of 16 faults.
 - The fault advice hasn’t been reviewed by a professional mechanic yet.
 
 The site’s “How far to trust this” page explains all this for visitors.
@@ -51,7 +51,7 @@ Real, correctly labeled recordings are the biggest improvement you can make, so 
 
 Only the measurements of each clip go into `public/data/sound-database.json`, never the audio itself. The `.gitignore` stops audio being committed by accident.
 
-**Check before you add.** A close match with a real recording outranks everything else, so a lopsided set is risky. In a test, adding only healthy engines made faulty ones match a healthy recording most of the time, which would tell people a knocking engine sounds normal. Add recordings of faults alongside any healthy ones, and measure accuracy before and after:
+**Check before you add.** A real recording only gives a capped boost to the closest match, but a lopsided set can still tilt results when someone records without answering the questions. With only healthy engines saved, a faulty engine recorded on its own can come out as healthy. Add recordings of faults alongside any healthy ones, and measure accuracy before and after:
 
 ```
 node scripts/evaluate-recordings.mjs <folder> [--half-as-references]
